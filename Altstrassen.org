@@ -1,0 +1,119 @@
+#+TITLE: Altstraßen in Hessen (DB)
+
+orientiert an: https://github.com/pepijn/travel_log (ruby)
+
+* Daten
+
+#+NAME: altstrassen
+| ID    | Name                                          | Quelle                  |
+|-------+-----------------------------------------------+-------------------------|
+| s0001 | Alter Fernverkehrsstrang rechts des Rheins    | Kropat, Wetterau, S. 5f |
+| s0002 | Alter Fernverkehrsstrang vom linken Rheinufer | Kropat, Wetterau, S. 6  |
+| s0003 | Rechts des Mains in die Wetterau              | Kropat, Wetterau, S. 6  |
+
+#+NAME: trassen
+| Ort            | ID    |       Lat |      Lon | Alternativort | Notiz                                     |
+|----------------+-------+-----------+----------+---------------+-------------------------------------------|
+| Heidelberg     | s0001 |           |          |               |                                           |
+| Oberramstadt   | s0001 |           |          | Bergstraße    |                                           |
+| Frankfurt/Main | s0001 |           |          |               |                                           |
+| Mainz-Weisenau | s0002 |           |          |               |                                           |
+| Guntheim       | s0002 | 50.014317 | 8.576245 |               | Kropat meint wohl: +Guntheim bei Walldorf |
+| Frankfurt/Main | s0002 |           |          |               |                                           |
+| Mainz-Kastel   | s0003 |           |          |               |                                           |
+| Hofheim/Taunus | s0003 |           |          |               |                                           |
+
+** Georeferenzieren
+
+#+NAME: georefaltstrassen
+#+HEADER: :var trassen=trassen
+#+HEADER: :var strassen=altstrassen
+#+HEADER: :results value
+#+BEGIN_SRC perl
+  use v5.10;
+  use Geo::Coder::OSM;
+  use Data::Dumper;
+
+  my $strasse;
+  foreach my $dataset (@{$strassen}) {
+      my ($id, $name, $quelle) = @{$dataset};
+      $strasse->{$id}->{'name'} = $name;
+      $strasse->{$id}->{'quelle'} = $quelle;
+  }
+
+  my $result;
+  my $geocoder = Geo::Coder::OSM->new;
+  foreach my $dataset (@{$trassen}) {
+      my ($ort, $id, $lat, $lon, $alternate, $notiz) = @{$dataset};
+      if ( $lat && $lon ) {
+          # if ( $georef =~ /^geo:([\d.]+),([\d.]+)$/g ) {
+      } else {
+          my $location = $geocoder->geocode(
+              location => $ort
+              );
+          ($lat, $lon) = ($location->{lat}, $location->{lon});
+      }
+      # say "https://www.openstreetmap.org/?mlat=" . $lat . "&mlon=" . $lon;
+      push @{$result}, join ("|", $ort, $id . ": " . $strasse->{$id}->{'name'}, $lat, $lon);
+  }
+  $result;
+#+END_SRC
+
+#+NAME: altstrassen-geoloc
+#+RESULTS: georefaltstrassen
+| Heidelberg     | s0001: Alter Fernverkehrsstrang rechts des Rheins    | 49.4093582 |   8.694724 |
+| Oberramstadt   | s0001: Alter Fernverkehrsstrang rechts des Rheins    |  49.329798 | 10.4390707 |
+| Frankfurt/Main | s0001: Alter Fernverkehrsstrang rechts des Rheins    | 35.2343075 | 25.0293752 |
+| Mainz-Weisenau | s0002: Alter Fernverkehrsstrang vom linken Rheinufer | 49.9746953 |  8.2853996 |
+| Guntheim       | s0002: Alter Fernverkehrsstrang vom linken Rheinufer |  50.014317 |   8.576245 |
+| Frankfurt/Main | s0002: Alter Fernverkehrsstrang vom linken Rheinufer | 35.2343075 | 25.0293752 |
+| Mainz-Kastel   | s0003: Rechts des Mains in die Wetterau              | 50.0083449 |  8.2844378 |
+| Hofheim/Taunus | s0003: Rechts des Mains in die Wetterau              | 50.0841921 |  8.4445447 |
+
+** GeoJSON-File erstellen
+
+#+NAME: altstrassen2geojson
+#+HEADER: :var altstrassen_geoloc=altstrassen-geoloc
+#+HEADER: :results value
+#+HEADER: :file Altstrassen.geojson
+#+BEGIN_SRC perl
+  use v5.10;
+  use Geo::JSON::Simple;
+  use Data::Dumper;
+
+  my @featurecollection;
+  my @points;
+  foreach my $dataset (@{$altstrassen_geoloc}) {
+      my ($ort, $altstrasse, $lat, $lon) = @{$dataset};
+      my $pt = point( $lon, $lat );
+      # my $ft = feature $pt, ( ort => $ort ) ;
+      push @featurecollection, $pt, ( ort => $ort );
+  }
+  # Dumper(@featurecollection);
+  my $gc = featurecollection(@featurecollection);
+  $gc->to_json;
+#+END_SRC
+
+#+RESULTS: altstrassen2geojson
+[[file:Altstrassen.geojson]]
+
+** GeoJSON-File auf GitHub                                     :crypt:
+-----BEGIN PGP MESSAGE-----
+
+hQEOA+Pz/bBZR3WsEAP5AVOQfIHqXUCMfyLMyK1KzC/4xYeMC7Z4iJKVU29HoxtG
+YzYBb+3LIUyO6Osp1uLDqu49lvg3EXSjelAiZ2c1zPNg9zNR0l/Gz484MqWPJP8q
+mHqy3i/uzAN6D3aGjmKv22jKzN5bXFVosOOSrdb/VAeD9tvF3D7Q8w7/MIcI4WkD
+/jDOLD9RApXl46Ov6DHjk4zit+n8bT7ExnrK/T/Rbt9GQb767k2p5Q4MhuTh6qi2
+i7gnoJ4YIQCxoWRskDXgvXl3fPbTwNUXfUd4KzoaAC8u8ien2skgYt0FtaS6MCBk
+QKiGLRKxO5sbyP0fF7Vyu0XlIgmEdVbYVaPT/It9o9zN0sDNAcPLs4CX2RVXc/d3
+OwiIoQ0kDpJ0j5Xk38Dp365my/YYcC3v5itnYSQQQX/Ys4CifWP06kFSNGjKBJ2X
+wf8LP+Y8CwY1a2PYZsrnE0P4BZx7YUZqUr1ogmqosSIeucMhp2gp+v2G7reufsqg
+wwad1a/I/A2s3xpwKSStpaAoQYzgVesGMaGOT3Mktk61cdQ+5fSUOIzQAIKwtxmK
+2T+qrkGp4CIn04Qy8DFidowWs3YD2NZWe1npRyVCwrPILZ39ygT7FAjSZtdhaLud
+VEB7EdJb5xjakUCXpIdUKc5ftLVInfpdMaHJbLLw0OkQWSl+o7DsIQxSl3Z2tRfw
+ZsDhTtzbFj0KRGbxtnlOOXzwM0B092BtdsQqBk8sbeDYxKw3fFzwq8kM09gSzsy7
+lA+c8O/zulNuhDczoI0lI3TpOVs/F7imEnL3PdajlxDkcMkvG4PjS0pOmFcsDLHT
+qh8dfNxeqFrH8HoXr1GGvuFFq67lcOxtxmSORdiHzCAxrEvCu/tXii3rj0kBsPWd
+gQ==
+=Nrtp
+-----END PGP MESSAGE-----
